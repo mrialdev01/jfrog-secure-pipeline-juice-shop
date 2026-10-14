@@ -69,8 +69,10 @@ jobs:
         run: jf npm install --build-name=${{ env.BUILD_NAME }} --build-number=${{ env.BUILD_NUMBER }}
 
       # ---- 2. Tests (quality gate #1: any failing test stops the pipeline) ----
+      # A few Juice Shop tests call github.com and other external sites, so they can
+      # fail on a network hiccup. Retry once; a genuine failure fails both attempts.
       - name: Run tests
-        run: npm test
+        run: npm test || (echo "Tests failed, retrying once (network-dependent tests can be flaky)" && npm test)
 
       # ---- 3. Package as Docker image, base images via Artifactory ----
       - name: Create .npmrc secret for the Docker build
