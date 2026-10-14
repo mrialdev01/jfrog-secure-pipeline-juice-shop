@@ -38,10 +38,30 @@ jobs:
           JF_URL: ${{ env.JF_URL }}
           JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
 
-      - name: Verify JFrog connection
-        run: jf rt ping
+      - name: Verify JFrog connection and credentials
+        env:
+          JF_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+        run: |
+          jf rt ping
+          # ping is anonymous, so also make one authenticated call
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${JF_TOKEN}" \
+            "${JF_URL}/artifactory/api/repositories/${NPM_VIRTUAL}")
+          echo "Authenticated API check: HTTP ${code}"
+          test "${code}" = "200"
 
       # ---- 1. Compile: dependencies resolved only through Artifactory ----
+      # Juice Shop's postinstall runs a nested `npm install` in frontend/.
+      # A user-level .npmrc makes every npm call resolve through Artifactory with credentials.
+      - name: Configure npm for Artifactory (also covers nested npm calls)
+        env:
+          JF_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+        run: |
+          {
+            echo "registry=${JF_URL}/artifactory/api/npm/${NPM_VIRTUAL}/"
+            echo "//${JF_HOST}/artifactory/api/npm/${NPM_VIRTUAL}/:_authToken=${JF_TOKEN}"
+          } > ~/.npmrc
+
       - name: Configure npm to resolve from Artifactory
         run: jf npmc --repo-resolve ${{ env.NPM_VIRTUAL }} --repo-deploy ${{ env.NPM_VIRTUAL }}
 
