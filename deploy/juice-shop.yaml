@@ -24,7 +24,7 @@ spec:
         runAsUser: 65532
       containers:
         - name: juice-shop
-          image: trialmrial.jfrog.io/jfjs-docker/jfrog-juice-shop:7
+          image: trialmrial.jfrog.io/jfjs-docker/jfrog-juice-shop:9
           ports:
             - containerPort: 3000
           securityContext:

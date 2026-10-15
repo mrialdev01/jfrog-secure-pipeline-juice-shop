@@ -65,7 +65,7 @@ The registry is private. Log in with a read-only token, then:
 
 ```bash
 docker login trialmrial.jfrog.io -u <user>
-docker run --rm -p 3000:3000 trialmrial.jfrog.io/jfjs-docker/jfrog-juice-shop:7
+docker run --rm -p 3000:3000 trialmrial.jfrog.io/jfjs-docker/jfrog-juice-shop:9
 # open http://localhost:3000
 ```
 
