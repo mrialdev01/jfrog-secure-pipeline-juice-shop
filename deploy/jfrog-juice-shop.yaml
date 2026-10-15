@@ -1,9 +1,17 @@
-# Minimal Kubernetes deployment for the image built by the secure pipeline.
-# Replace the tag with a build number from Artifactory (e.g. 7).
+# Kubernetes deployment for the image built by the secure pipeline (build 12).
 #
-# The registry is private, so create a pull secret first (token = read-only, never commit it):
+# Option A - offline (recommended for reviewers): load the delivered archive, no registry access needed.
+#   docker load < juice-shop-12.tar.gz
+#   kind load docker-image trialmrial.jfrog.io/jfjs-docker/jfrog-juice-shop:12      # for a kind cluster
+#   kubectl apply -f jfrog-juice-shop.yaml
+#   (The missing "jfrog-pull" secret below only produces a harmless warning when the image is already present.)
+#
+# Option B - pull from the JFrog trial registry with a read-only token (never commit the token):
 #   kubectl create secret docker-registry jfrog-pull \
 #     --docker-server=trialmrial.jfrog.io --docker-username=<user> --docker-password=<read-only-token>
+#   kubectl apply -f jfrog-juice-shop.yaml
+#
+# Then:  kubectl port-forward svc/jfrog-juice-shop 3000:3000   ->  http://localhost:3000
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,7 +32,8 @@ spec:
         runAsUser: 65532
       containers:
         - name: juice-shop
-          image: trialmrial.jfrog.io/jfjs-docker/jfrog-juice-shop:9
+          image: trialmrial.jfrog.io/jfjs-docker/jfrog-juice-shop:12
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           securityContext:
@@ -48,5 +57,5 @@ metadata:
 spec:
   selector: {app: jfrog-juice-shop}
   ports:
-    - port: 80
+    - port: 3000
       targetPort: 3000

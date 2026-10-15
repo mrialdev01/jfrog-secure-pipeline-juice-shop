@@ -69,8 +69,8 @@ docker run --rm -p 3000:3000 trialmrial.jfrog.io/jfjs-docker/jfrog-juice-shop:9
 # open http://localhost:3000
 ```
 
-Kubernetes: `deploy/juice-shop.yaml` (create the pull secret as described at the top of the file),
-then `kubectl apply -f deploy/juice-shop.yaml` and `kubectl port-forward svc/jfrog-juice-shop 3000:80`.
+Kubernetes: `deploy/jfrog-juice-shop.yaml` (create the pull secret as described at the top of the file),
+then `kubectl apply -f deploy/jfrog-juice-shop.yaml` and `kubectl port-forward svc/jfrog-juice-shop 3000:80`.
 
 Build locally without JFrog: `docker build -t jfrog-juice-shop .` (the Dockerfile defaults pull
 public base images and the npm secret mount is optional).
@@ -82,7 +82,7 @@ public base images and the npm secret mount is optional).
 | `.github/workflows/secure-pipeline.yml` | The pipeline |
 | `Dockerfile` | Multi-stage build, base images parameterised so CI routes them through Artifactory |
 | `scripts/jfrog-setup.sh` | Creates the repositories (admin token via env var, never committed) |
-| `deploy/juice-shop.yaml` | Kubernetes Deployment and Service |
+| `deploy/jfrog-juice-shop.yaml` | Kubernetes Deployment and Service |
 | `docs/` | Xray scan export and CycloneDX SBOM |
 
 ## Security notes and next steps
