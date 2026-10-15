@@ -1,246 +1,138 @@
-# ![Juice Shop Logo](https://raw.githubusercontent.com/juice-shop/juice-shop/master/frontend/src/assets/public/images/JuiceShop_Logo_100px.png) OWASP Juice Shop
+# DevOps Demo
 
-[![OWASP Flagship](https://img.shields.io/badge/owasp-flagship%20project-48A646.svg)](https://owasp.org/projects/#sec-flagships)
-[![GitHub release](https://img.shields.io/github/release/juice-shop/juice-shop.svg)](https://github.com/juice-shop/juice-shop/releases/latest)
-[![Twitter Follow](https://img.shields.io/twitter/follow/owasp_juiceshop.svg?style=social&label=Follow)](https://twitter.com/owasp_juiceshop)
-[![Subreddit subscribers](https://img.shields.io/reddit/subreddit-subscribers/owasp_juiceshop?style=social)](https://reddit.com/r/owasp_juiceshop)
+A small end-to-end DevOps project for learning and demos: a tiny Flask app that goes from a `git push` to a running, monitored deployment on Kubernetes, with every step automated.
 
-[![CI/CD Pipeline](https://github.com/juice-shop/juice-shop/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/juice-shop/juice-shop/actions/workflows/ci.yml)
-[![Release Pipeline](https://github.com/juice-shop/juice-shop/actions/workflows/release.yml/badge.svg)](https://github.com/juice-shop/juice-shop/actions/workflows/release.yml)
-[![Coverage Status](https://coveralls.io/repos/github/juice-shop/juice-shop/badge.svg?branch=develop)](https://coveralls.io/github/juice-shop/juice-shop?branch=develop)
-[![Cypress tests](https://img.shields.io/endpoint?url=https://dashboard.cypress.io/badge/simple/3hrkhu/develop&style=flat&logo=cypress)](https://dashboard.cypress.io/projects/3hrkhu/runs)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/223/badge)](https://www.bestpractices.dev/projects/223)
-![GitHub stars](https://img.shields.io/github/stars/juice-shop/juice-shop.svg?label=GitHub%20%E2%98%85&style=flat)
-[![Static Badge](https://img.shields.io/badge/OWASP-Code_of_Conduct-blue)](CODE_OF_CONDUCT.md)
+- **CI** with GitHub Actions: tests, image build, vulnerability scan
+- **Registry**: GitHub Container Registry (ghcr.io)
+- **GitOps** CD with Argo CD on a local kind cluster
+- **Observability** with Prometheus and Grafana (dashboard stored in Git)
+- **Dependency updates** with Dependabot
 
-> [The most trustworthy online shop out there.](https://twitter.com/dschadow/status/706781693504589824)
-> ([@dschadow](https://github.com/dschadow)) —
-> [The best juice shop on the whole internet!](https://twitter.com/shehackspurple/status/907335357775085568)
-> ([@shehackspurple](https://twitter.com/shehackspurple)) —
-> [Actually the most bug-free vulnerable application in existence!](https://youtu.be/TXAztSpYpvE?t=26m35s)
-> ([@vanderaj](https://twitter.com/vanderaj)) —
-> [First you 😂😂then you 😢](https://twitter.com/kramse/status/1073168529405472768)
-> ([@kramse](https://twitter.com/kramse)) —
-> [But this doesn't have anything to do with juice.](https://twitter.com/coderPatros/status/1199268774626488320)
-> ([@coderPatros' wife](https://twitter.com/coderPatros))
+## How it fits together
 
-OWASP Juice Shop is probably the most modern and sophisticated insecure web application! It can be used in security
-trainings, awareness demos, CTFs and as a guinea pig for security tools! Juice Shop encompasses vulnerabilities from the
-entire
-[OWASP Top Ten](https://owasp.org/www-project-top-ten) along with many other security flaws found in real-world
-applications!
+```mermaid
+flowchart LR
+    Dev["Developer (VS Code)"] -->|git push| GH["GitHub repo"]
+    GH --> CI["GitHub Actions: tests"]
+    CI --> Build["Build image + Trivy scan"]
+    Build -->|push image| GHCR["ghcr.io registry"]
+    Build --> Upd["Set image tag in k8s/deployment.yaml"]
+    Upd -->|commit to main| GH
+    GH -->|Argo CD watches k8s/| Argo["Argo CD"]
+    Argo -->|sync| K8s["Kubernetes (kind)"]
+    GHCR -->|image pull| K8s
+    K8s --> App["devops-demo pods"]
+    Prom["Prometheus"] -->|scrape /metrics| App
+    Graf["Grafana"] --> Prom
+```
 
-![Juice Shop Screenshot Slideshow](screenshots/slideshow.gif)
+**The release loop:** a push to `main` runs the tests, builds the image, scans it with Trivy, and publishes it tagged with the commit SHA. A final job writes that SHA into `k8s/deployment.yaml` and commits it back. Argo CD sees the new commit and rolls out the new version. Nobody runs `kubectl` to deploy.
 
-For a detailed introduction, full list of features and architecture overview please visit the official project page:
-<https://owasp-juice.shop>
+## Repository layout
 
-## Table of contents
+| Path | What it is |
+|------|------------|
+| `app.py`, `test_app.py`, `requirements.txt` | The Flask app (`/`, `/health`, `/metrics`) and its tests |
+| `Dockerfile` | Python 3.14 slim image, OS patches applied, pip removed, non-root user |
+| `.github/workflows/ci.yml` | Jobs: `test`, `build-scan-push`, `update-manifest` |
+| `.github/dependabot.yml` | Weekly updates for Actions, pip packages and the base image |
+| `k8s/` | Deployment, Service, ServiceMonitor and Grafana dashboard (everything Argo CD syncs) |
+| `argocd/application.yaml` | Tells Argo CD to watch `k8s/` on `main` |
 
-- [Setup](#setup)
-    - [From Sources](#from-sources)
-    - [Packaged Distributions](#packaged-distributions)
-    - [Docker Container](#docker-container)
-    - [Vagrant](#vagrant)
-- [Demo](#demo)
-- [Documentation](#documentation)
-    - [Node.js version compatibility](#nodejs-version-compatibility)
-    - [Troubleshooting](#troubleshooting)
-    - [Official companion guide](#official-companion-guide)
-- [Contributing](#contributing)
-- [References](#references)
-- [Merchandise](#merchandise)
-- [Donations](#donations)
-- [Contributors](#contributors)
-- [Licensing](#licensing)
+## Prerequisites
 
-## Setup
+Ubuntu with Docker Engine (real Docker, not the `podman-docker` shim), plus `kubectl`, `kind` and `helm`. Your user must be in the `docker` group.
 
-> You can find some less common installation variations as well as instructions to run Juice Shop on a variety of cloud computing providers in
-> [the _Running OWASP Juice Shop_ documentation](https://pwning.owasp-juice.shop/companion-guide/latest/part1/running.html).
+## Run the app locally
 
-> Some challenges require an AI/LLM provider to work properly. Check the
-> [_Setting up external dependencies_ documentation](https://pwning.owasp-juice.shop/companion-guide/snapshot/part1/running.html#_setting_up_external_dependencies)
-> for instructions on configuring local or cloud-based AI providers.
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pytest
+python app.py              # http://localhost:8080
+```
 
-### From Sources
+## Rebuild the whole environment
 
-![GitHub repo size](https://img.shields.io/github/repo-size/juice-shop/juice-shop.svg)
+Order matters: the monitoring stack installs the `ServiceMonitor` type that Argo CD later applies.
 
-1. Install [node.js](#nodejs-version-compatibility)
-2. Run `git clone https://github.com/juice-shop/juice-shop.git --depth 1` (or
-   clone [your own fork](https://github.com/juice-shop/juice-shop/fork)
-   of the repository)
-3. Go into the cloned folder with `cd juice-shop`
-4. Run `npm install` (only has to be done before first start or when you change the source code)
-5. Run `npm start`
-6. Browse to <http://localhost:3000>
+```bash
+# 1. Cluster
+KIND_EXPERIMENTAL_PROVIDER=docker kind create cluster --name devops-demo
 
-### Packaged Distributions
+# 2. Monitoring stack (Prometheus + Grafana)
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  -n monitoring --create-namespace \
+  --set alertmanager.enabled=false \
+  --set kubeControllerManager.enabled=false \
+  --set kubeEtcd.enabled=false \
+  --set kubeScheduler.enabled=false \
+  --set kubeProxy.enabled=false
 
-[![GitHub release](https://img.shields.io/github/downloads/juice-shop/juice-shop/total.svg)](https://github.com/juice-shop/juice-shop/releases/latest)
-[![SourceForge](https://img.shields.io/sourceforge/dm/juice-shop?label=sourceforge%20downloads)](https://sourceforge.net/projects/juice-shop/)
-[![SourceForge](https://img.shields.io/sourceforge/dt/juice-shop?label=sourceforge%20downloads)](https://sourceforge.net/projects/juice-shop/)
+# 3. Pull secret, only if the ghcr.io package is private
+#    Use a classic token with the read:packages scope only. Never commit it.
+read -s -p "GitHub token: " GHCR_TOKEN; echo
+kubectl create secret docker-registry ghcr-pull \
+  --docker-server=ghcr.io --docker-username=mrialdev01 --docker-password="$GHCR_TOKEN"
+unset GHCR_TOKEN
 
-1. Install a 64bit [node.js](#nodejs-version-compatibility) on your Windows, MacOS or Linux machine
-2. Download `juice-shop-<version>_<node-version>_<os>_x64.zip` (or
-   `.tgz`) attached to
-   [latest release](https://github.com/juice-shop/juice-shop/releases/latest)
-3. Unpack and `cd` into the unpacked folder
-4. Run `npm start`
-5. Browse to <http://localhost:3000>
+# 4. Argo CD
+kubectl create namespace argocd
+kubectl apply -n argocd --server-side --force-conflicts \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-> Each packaged distribution includes some binaries for `sqlite3` and
-> `libxmljs2` bound to the OS and node.js version which `npm install` was
-> executed on.
+# 5. Tell Argo CD to deploy this repo
+kubectl apply -f argocd/application.yaml
+```
 
-### Docker Container
+If the repository is private, give Argo CD read access (Argo CD UI: Settings, Repositories) before step 5.
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/bkimminich/juice-shop.svg)](https://hub.docker.com/r/bkimminich/juice-shop)
-![Docker Stars](https://img.shields.io/docker/stars/bkimminich/juice-shop.svg)
-[![](https://images.microbadger.com/badges/image/bkimminich/juice-shop.svg)](https://microbadger.com/images/bkimminich/juice-shop
-"Get your own image badge on microbadger.com")
-[![](https://images.microbadger.com/badges/version/bkimminich/juice-shop.svg)](https://microbadger.com/images/bkimminich/juice-shop
-"Get your own version badge on microbadger.com")
+## Access the UIs
 
-1. Install [Docker](https://www.docker.com)
-2. Run `docker pull bkimminich/juice-shop`
-3. Run `docker run --rm -p 127.0.0.1:3000:3000 bkimminich/juice-shop`
-4. Browse to <http://localhost:3000> (on macOS and Windows browse to
-   <http://192.168.99.100:3000> if you are using docker-machine instead of the native docker installation)
+Each command runs in its own terminal and keeps running.
 
-### Vagrant
+| What | Command | URL |
+|------|---------|-----|
+| App | `kubectl port-forward svc/devops-demo 8081:8080` | http://localhost:8081 |
+| Argo CD | `kubectl -n argocd port-forward svc/argocd-server 8443:443` | https://localhost:8443 |
+| Grafana | `kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80` | http://localhost:3000 |
+| Prometheus | `kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090:9090` | http://localhost:9090 |
 
-1. Install [Vagrant](https://www.vagrantup.com/downloads.html) and
-   [Virtualbox](https://www.virtualbox.org/wiki/Downloads)
-2. Run `git clone https://github.com/juice-shop/juice-shop.git` (or
-   clone [your own fork](https://github.com/juice-shop/juice-shop/fork)
-   of the repository)
-3. Run `cd vagrant && vagrant up`
-4. Browse to [192.168.56.110](http://192.168.56.110)
+Passwords (user `admin` in both):
 
-## Demo
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
+kubectl -n monitoring get secret kube-prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d; echo
+```
 
-Feel free to have a look at the latest version of OWASP Juice Shop:
-<http://demo.owasp-juice.shop>
+## Demo script
 
-> This is a deployment-test and sneak-peek instance only! You are __not
-> supposed__ to use this instance for your own hacking endeavours! No
-> guaranteed uptime! Guaranteed stern looks if you break it!
+1. **Show the pipeline.** Change the greeting and version in `app.py`, update the expected version in `test_app.py`, then commit and push.
+2. **Watch GitHub Actions.** `test`, then `build-scan-push` (Trivy gate), then `update-manifest`. Pull afterwards to see the `Deploy <sha>` commit.
+3. **Watch Argo CD.** It detects the new tag in Git and rolls out the pods (click Refresh to skip the polling interval of about 3 minutes).
+4. **Confirm.** `curl localhost:8081` returns the new greeting and version.
+5. **Show GitOps self-heal.** Run `kubectl scale deployment/devops-demo --replicas=1` and watch Argo CD restore the count from Git.
+6. **Show observability.** Open the **DevOps Demo** dashboard in Grafana and generate traffic:
+   ```bash
+   kubectl run curl-test --rm -it --restart=Never --image=curlimages/curl -- \
+     sh -c 'for i in $(seq 1 300); do curl -s -o /dev/null http://devops-demo:8080/; sleep 0.2; done'
+   ```
 
-## Documentation
+## Lessons learned and gotchas
 
-### Node.js version compatibility
+- **Pin third-party actions.** An old Trivy action tag disappeared after a supply-chain incident in March 2026. Tags can be moved; pinning an action to a full commit SHA is the hardened practice.
+- **Scan findings can come from the base image.** Trivy flagged OS packages (fixed by `apt-get upgrade`) and the bundled libraries inside pip (fixed by removing pip from the final image).
+- **Image tags and GitOps.** With `:latest`, Git never changes, so Argo CD sees nothing to deploy. Tagging with the commit SHA makes every release a change in Git.
+- **`kubectl port-forward svc/...` picks one pod.** It does not load balance. Real balancing is done by kube-proxy for traffic inside the cluster.
+- **kind exposes its API on a random host port** that can change after a restart. If `kubectl` says "connection refused", run `KIND_EXPERIMENTAL_PROVIDER=docker kind export kubeconfig --name devops-demo`.
+- **Control-plane targets in Prometheus** (etcd, scheduler, controller-manager, kube-proxy) show as down on kind because they listen only on localhost. They are disabled in the Helm install above.
+- **Label clash in the dashboard.** The app's `endpoint` metric label collides with a label Prometheus adds, so it is stored as `exported_endpoint`.
+- **Podman vs Docker.** The `podman-docker` package fakes the `docker` command, and kind then tries its experimental Podman provider. Install real Docker Engine instead.
 
-![GitHub package.json dynamic](https://img.shields.io/github/package-json/cpu/juice-shop/juice-shop)
-![GitHub package.json dynamic](https://img.shields.io/github/package-json/os/juice-shop/juice-shop)
+## Clean up
 
-OWASP Juice Shop officially supports the following versions of
-[node.js](http://nodejs.org) in line with the official
-[node.js LTS schedule](https://github.com/nodejs/LTS) as close as possible. Docker images and packaged distributions are
-offered accordingly.
-
-| node.js | Supported              | Tested             | [Packaged Distributions](#packaged-distributions) | [Docker images](#docker-container) from `master` | [Docker images](#docker-container) from `develop` |
-|:--------|:-----------------------|:-------------------|:--------------------------------------------------|:-------------------------------------------------|:--------------------------------------------------|
-| 26.x    | :heavy_check_mark:     | :heavy_check_mark: |                                                   |                                                  |                                                   |
-| 25.x    | ( :heavy_check_mark: ) | :x:                |                                                   |                                                  |                                                   |
-| 24.x    | :heavy_check_mark:     | :heavy_check_mark: | Windows (`x64`), MacOS (`x64`), Linux (`x64`)     | `latest` (`linux/amd64`, `linux/arm64`)          | `snapshot` (`linux/amd64`, `linux/arm64`)         |
-| 23.x    | :x:                    | :x:                |                                                   |                                                  |                                                   |
-| 22.x    | :heavy_check_mark:     | :heavy_check_mark: |                                                   |                                                  |                                                   |
-| <22.x   | :x:                    | :x:                |                                                   |                                                  |                                                   |
-
-Juice Shop is automatically tested _only on the latest `.x` minor version_ of each node.js version mentioned above!
-There is no guarantee that older minor node.js releases will always work with Juice Shop!
-Please make sure you stay up to date with your chosen version.
-
-### Troubleshooting
-
-[![Gitter](http://img.shields.io/badge/gitter-join%20chat-1dce73.svg)](https://gitter.im/bkimminich/juice-shop)
-
-If you need help with the application setup please check 
-[our existing _Troubleshooting_](https://pwning.owasp-juice.shop/companion-guide/latest/part4/troubleshooting.html)
-guide. If this does not solve your issue please post your specific problem or question in the
-[Gitter Chat](https://gitter.im/bkimminich/juice-shop) where community members can best try to help you.
-
-:stop_sign: **Please avoid opening GitHub issues for support requests or questions!**
-
-### Official companion guide
-
-[![Write Goodreads Review](https://img.shields.io/badge/goodreads-write%20review-49557240.svg)](https://www.goodreads.com/review/edit/49557240)
-
-OWASP Juice Shop comes with an official companion guide eBook. It will give you a complete overview of all
-vulnerabilities found in the application including hints how to spot and exploit them. In the appendix you will even
-find complete step-by-step solutions to every challenge. Extensive documentation of
-[custom re-branding](https://pwning.owasp-juice.shop/companion-guide/latest/part4/customization.html),
-[CTF-support](https://pwning.owasp-juice.shop/companion-guide/latest/part4/ctf.html),
-[trainer's guide](https://pwning.owasp-juice.shop/companion-guide/latest/part4/trainers.html)
-and much more is also included.
-
-[Pwning OWASP Juice Shop](https://leanpub.com/juice-shop) is published under
-[CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/)
-and is available **for free** in PDF, Kindle and ePub format on LeanPub. You can also
-[browse the full content online](https://pwning.owasp-juice.shop)!
-
-[<img alt="Pwning OWASP Juice Shop cover" src="https://raw.githubusercontent.com/juice-shop/pwning-juice-shop/master/docs/modules/ROOT/assets/images/cover.jpg" width="200"/>](https://leanpub.com/juice-shop)
-[<img alt="Pwning OWASP Juice Shop back cover" src="https://raw.githubusercontent.com/juice-shop/pwning-juice-shop/master/docs/modules/ROOT/assets/images/introduction/back.jpg" width="200"/>](https://leanpub.com/juice-shop)
-
-## Contributing
-
-[![GitHub contributors](https://img.shields.io/github/contributors/juice-shop/juice-shop.svg)](https://github.com/juice-shop/juice-shop/graphs/contributors)
-[![JavaScript Style Guide](https://img.shields.io/badge/code%20style-standard-brightgreen.svg)](http://standardjs.com/)
-[![Crowdin](https://d322cqt584bo4o.cloudfront.net/owasp-juice-shop/localized.svg)](https://crowdin.com/project/owasp-juice-shop)
-![GitHub issues by-label](https://img.shields.io/github/issues/juice-shop/juice-shop/help%20wanted.svg)
-![GitHub issues by-label](https://img.shields.io/github/issues/juice-shop/juice-shop/good%20first%20issue.svg)
-
-We are always happy to get new contributors on board! Please check
-[CONTRIBUTING.md](CONTRIBUTING.md) to learn how to
-[contribute to our codebase](CONTRIBUTING.md#code-contributions) or the
-[translation into different languages](CONTRIBUTING.md#i18n-contributions)!
-
-## References
-
-Did you write a blog post, magazine article or do a podcast about or mentioning OWASP Juice Shop? Or maybe you held or
-joined a conference talk or meetup session, a hacking workshop or public training where this project was mentioned?
-
-Add it to our ever-growing list of [REFERENCES.md](REFERENCES.md) by forking and opening a Pull Request!
-
-## Merchandise
-
-* On [Spreadshirt.com](http://shop.spreadshirt.com/juiceshop) and
-  [Spreadshirt.de](http://shop.spreadshirt.de/juiceshop) you can get some swag (Shirts, Hoodies, Mugs) with the official
-  OWASP Juice Shop logo
-* On
-  [StickerYou.com](https://www.stickeryou.com/products/owasp-juice-shop/794)
-  you can get variants of the OWASP Juice Shop logo as single stickers to decorate your laptop with. They can also print
-  magnets, iron-ons, sticker sheets and temporary tattoos.
-
-## Donations
-
-[![](https://img.shields.io/badge/support-owasp%20juice%20shop-blue)](https://owasp.org/donate/?reponame=www-project-juice-shop&title=OWASP+Juice+Shop)
-
-The OWASP Foundation gratefully accepts donations via Stripe. Projects such as Juice Shop can then request reimbursement
-for expenses from the Foundation. If you'd like to express your support of the Juice Shop project, please make sure to
-tick the "Publicly list me as a supporter of OWASP Juice Shop" checkbox on the donation form. You can find our more
-about donations and how they are used here:
-
-<https://pwning.owasp-juice.shop/companion-guide/latest/part3/donations.html>
-
-## Contributors
-
-The OWASP Juice Shop Project Leaders are:
-
-- [Björn Kimminich](https://github.com/bkimminich) aka `bkimminich` [![Keybase PGP](https://img.shields.io/keybase/pgp/bkimminich)](https://keybase.io/bkimminich)
-- [Jannik Hollenbach](https://github.com/J12934) aka `J12934`
-
-For a list of all contributors to the OWASP Juice Shop please visit our
-[HALL_OF_FAME.md](HALL_OF_FAME.md).
-
-## Licensing
-
-[![license](https://img.shields.io/github/license/juice-shop/juice-shop.svg)](LICENSE)
-
-This program is free software: you can redistribute it and/or modify it under the terms of the [MIT license](LICENSE).
-OWASP Juice Shop and any contributions are Copyright © by Bjoern Kimminich & the OWASP Juice Shop contributors
-2014-2026.
-
-![Juice Shop Logo](https://raw.githubusercontent.com/juice-shop/juice-shop/master/frontend/src/assets/public/images/JuiceShop_Logo_400px.png)
+```bash
+KIND_EXPERIMENTAL_PROVIDER=docker kind delete cluster --name devops-demo
+```

@@ -1,0 +1,52 @@
+# Minimal Kubernetes deployment for the image built by the secure pipeline.
+# Replace the tag with a build number from Artifactory (e.g. 7).
+#
+# The registry is private, so create a pull secret first (token = read-only, never commit it):
+#   kubectl create secret docker-registry jfrog-pull \
+#     --docker-server=trialmrial.jfrog.io --docker-username=<user> --docker-password=<read-only-token>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jfrog-juice-shop
+  labels: {app: jfrog-juice-shop}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: jfrog-juice-shop}
+  template:
+    metadata:
+      labels: {app: jfrog-juice-shop}
+    spec:
+      imagePullSecrets:
+        - name: jfrog-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: juice-shop
+          image: trialmrial.jfrog.io/jfjs-docker/jfrog-juice-shop:7
+          ports:
+            - containerPort: 3000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false   # Juice Shop writes to ./data and ./logs at runtime
+            capabilities: {drop: ["ALL"]}
+          readinessProbe:
+            httpGet: {path: /rest/admin/application-version, port: 3000}
+            initialDelaySeconds: 10
+          livenessProbe:
+            httpGet: {path: /rest/admin/application-version, port: 3000}
+            initialDelaySeconds: 30
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jfrog-juice-shop
+spec:
+  selector: {app: jfrog-juice-shop}
+  ports:
+    - port: 80
+      targetPort: 3000
