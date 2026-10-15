@@ -24,6 +24,7 @@ env:
 
 permissions:
   contents: read
+  id-token: write   # lets the job request a GitHub OIDC token
 
 jobs:
   build:
@@ -35,14 +36,19 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # Keyless auth: GitHub issues a short-lived OIDC token, JFrog exchanges it for a
+      # short-lived access token scoped to group github-ci. No stored secret.
       - uses: jfrog/setup-jfrog-cli@v4
+        id: setup-cli
         env:
           JF_URL: ${{ env.JF_URL }}
-          JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+        with:
+          oidc-provider-name: github-oidc
+          oidc-audience: jfrog-github
 
       - name: Verify JFrog connection and credentials
         env:
-          JF_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+          JF_TOKEN: ${{ steps.setup-cli.outputs.oidc-token }}
         run: |
           jf rt ping
           # ping is anonymous, so also make one authenticated call
@@ -57,7 +63,7 @@ jobs:
       # A user-level .npmrc makes every npm call resolve through Artifactory with credentials.
       - name: Configure npm for Artifactory (also covers nested npm calls)
         env:
-          JF_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+          JF_TOKEN: ${{ steps.setup-cli.outputs.oidc-token }}
         run: |
           {
             echo "registry=${JF_URL}/artifactory/api/npm/${NPM_VIRTUAL}/"
@@ -81,11 +87,11 @@ jobs:
         run: |
           {
             echo "registry=${JF_URL}/artifactory/api/npm/${NPM_VIRTUAL}/"
-            echo "//${JF_HOST}/artifactory/api/npm/${NPM_VIRTUAL}/:_authToken=${{ secrets.JF_ACCESS_TOKEN }}"
+            echo "//${JF_HOST}/artifactory/api/npm/${NPM_VIRTUAL}/:_authToken=${{ steps.setup-cli.outputs.oidc-token }}"
           } > "$RUNNER_TEMP/npmrc"
 
       - name: Log in to Artifactory Docker registry
-        run: echo "${{ secrets.JF_ACCESS_TOKEN }}" | docker login "${JF_HOST}" -u "${{ secrets.JF_USER }}" --password-stdin
+        run: echo "${{ steps.setup-cli.outputs.oidc-token }}" | docker login "${JF_HOST}" -u "${{ steps.setup-cli.outputs.oidc-user }}" --password-stdin
 
       - name: Build image
         env:
