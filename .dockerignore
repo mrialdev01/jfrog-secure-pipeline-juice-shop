@@ -31,3 +31,7 @@ scripts/
 terraform/
 test/
 vagrant/
+UPSTREAM_COMMIT.txt
+README.md
+deploy/
+docs/

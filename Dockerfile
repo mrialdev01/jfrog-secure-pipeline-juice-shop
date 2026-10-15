@@ -1,9 +1,15 @@
-FROM node:24 AS installer
+ARG NODE_IMAGE=node:24                                        
+ARG DISTROLESS_IMAGE=gcr.io/distroless/nodejs24-debian13      
+
+FROM ${NODE_IMAGE} AS installer                               
 COPY . /juice-shop
 WORKDIR /juice-shop
-RUN npm install -g typescript@^6.0.3
-RUN npm install --omit=dev
-RUN npm dedupe --omit=dev
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
+    npm install -g typescript@^6.0.3                          
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
+    npm install --omit=dev                                    
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
+    npm dedupe --omit=dev                                     
 RUN rm -rf frontend/node_modules
 RUN rm -rf frontend/.angular
 RUN rm -rf frontend/src/assets
@@ -16,10 +22,11 @@ RUN rm i18n/*.json || true
 
 # keep version in sync with package.json
 ARG CYCLONEDX_NPM_VERSION='^2.0.0||^3.0.0||^4.0.0'
-RUN npm install -g @cyclonedx/cyclonedx-npm@$CYCLONEDX_NPM_VERSION
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
+    npm install -g @cyclonedx/cyclonedx-npm@$CYCLONEDX_NPM_VERSION   
 RUN npm run sbom
 
-FROM gcr.io/distroless/nodejs24-debian13
+FROM ${DISTROLESS_IMAGE}                                      
 ARG BUILD_DATE
 ARG VCS_REF
 LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
