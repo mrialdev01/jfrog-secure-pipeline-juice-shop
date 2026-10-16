@@ -14,6 +14,10 @@ jobs:
     # job waits for a required reviewer on the "frogbot" environment before it starts.
     environment: frogbot
     steps:
+      # Same Node/npm as the main pipeline. The runner's default npm 10.9.x crashed on the frontend/ lockfile.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
       - uses: jfrog/frogbot@v2
         env:
           JF_URL: https://trialmrial.jfrog.io
