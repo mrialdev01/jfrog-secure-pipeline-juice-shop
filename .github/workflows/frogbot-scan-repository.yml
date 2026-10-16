@@ -23,7 +23,6 @@ jobs:
           JF_URL: https://trialmrial.jfrog.io
           JF_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           JF_GIT_BASE_BRANCH: ${{ matrix.branch }}
-          JF_PROJECT: jfjs
           JF_SKIP_AUTOFIX: "true"   # scan and report only; do not open fix PRs (the app is left unchanged on purpose)
         with:
           oidc-provider-name: github-oidc

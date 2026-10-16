@@ -22,7 +22,6 @@ jobs:
         env:
           JF_URL: https://trialmrial.jfrog.io
           JF_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          JF_PROJECT: jfjs   # scope Xray scans to the JFrog project
         with:
           oidc-provider-name: github-oidc
           oidc-audience: jfrog-github
