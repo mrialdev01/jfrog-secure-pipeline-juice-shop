@@ -38,8 +38,10 @@ SBOM is generated on every run and stored with the workflow run.
 
 ## Xray results (build 12)
 
-Xray reports **10 Critical and 31 High** vulnerabilities. The policy gate fails the build, so the
-image stays in `jfjs-docker-dev-local` and is not promoted.
+Xray scans 1,188 components in the build and reports 103 vulnerabilities (10 Critical, 36 High,
+45 Medium, 12 Low). The policy `jfjs-block-high-critical` flags the High and Critical ones:
+**46 policy violations (10 Critical, 36 High)**. The gate fails the build, so the image stays in
+`jfjs-docker-dev-local` and is not promoted.
 
 ### Most risky finding: `jsonwebtoken` 0.4.0 (Critical)
 
