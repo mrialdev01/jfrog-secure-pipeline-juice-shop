@@ -24,6 +24,7 @@ jobs:
           JF_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           JF_GIT_BASE_BRANCH: ${{ matrix.branch }}
           JF_SKIP_AUTOFIX: "true"   # scan and report only; do not open fix PRs (the app is left unchanged on purpose)
+          JF_PROJECT: jfjs
         with:
           oidc-provider-name: github-oidc
           oidc-audience: jfrog-github
